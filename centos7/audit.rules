@@ -1,0 +1,182 @@
+# PCI:V2.00  for CentOS 7
+# only /var/log/audit monitored unconditionally
+# /var/log monitored through normal physical users activity
+# cluster logs monitored only for changes in attributes
+# exclude of /tmp /dev/shm /var/lock/lvm due to cluster activity
+# /etc/motd attributes only
+# This file contains the auditctl rules that are loaded
+# whenever the audit daemon is started via the initscripts.
+# The rules are simply the parameters that would be passed
+# to auditctl.
+
+# First rule - delete all
+-D
+-f 1
+-r 900
+
+# Ignore Errors
+-i
+
+# Increase the buffers to survive stress events.
+# Make this bigger for busy systems
+-b 8192
+
+# Feel free to add below this line. See auditctl man page
+# Because of the cluster we need to exclude some directories
+-a exit,never -F arch=b32 -F dir=/tmp/
+-a exit,never -F arch=b64 -F dir=/tmp/
+-a exit,never -F arch=b32 -F dir=/dev/shm/
+-a exit,never -F arch=b64 -F dir=/dev/shm/
+-a exit,never -F arch=b32 -F dir=/var/lock/lvm/
+-a exit,never -F arch=b64 -F dir=/var/lock/lvm/
+
+
+# Compulsory watches must be near the top
+#
+# System files
+-a exit,always  -F path=/usr/local/authorized_keys/.give_access -F perm=wa -F key=give_access
+-a exit,always  -F dir=/sbin/ -F perm=wa -F key=sbin
+-a exit,always  -F dir=/bin/ -F perm=wa -F key=bin
+-a exit,always  -F dir=/usr/sbin/ -F perm=wa -F key=usrsbin
+-a exit,always  -F dir=/usr/bin/ -F perm=wa -F key=usrbin
+-a exit,always  -F dir=/usr/local/sbin/ -F perm=wa -F key=usrlocalsbin
+-a exit,always  -F dir=/usr/local/bin/ -F perm=wa -F key=usrlocalbin
+-a exit,always  -F dir=/etc/lvm/cache -F perm=a -F key=lvmcache
+-a exit,always  -F path=/etc/motd -F perm=a -F key=motd
+-a exit,always  -F dir=/etc/ -F perm=wa -F key=etc
+## PCI/DSS - Requirement 10.2.3
+## Monitor access to all audit trails
+## Here audit trails means /var/log/audit/*
+## They are monitored unconditionaly while others logs are monitored through physical users activity
+##
+-a exit,always  -F dir=/var/log/audit/  -F perm=rwa -F key=audit_log 
+
+
+-a exit,never -F arch=b32 -S all -F auid=4294967295
+-a exit,never -F arch=b64 -S all -F auid=4294967295
+
+## PCI/DSS - Tracking physical users
+## for performance purpose syscals with identical condition should be on one line
+-a exit,always  -F dir=/var/log/  -F perm=rwa -F auid>1000000 -F auid<9999999 -k log_IAM 
+-a exit,always -F arch=b32 -S execve  -S chown32 -S chmod -S truncate -S lchown32 -S rename -S renameat -S rmdir -S setfsgid32 -S setgid32 -S setuid32 -F auid>1000000 -F auid<9999999 -F auid!=4294967295 -C auid!=uid -k IAM32
+-a exit,always -F arch=b64 -S execve  -S chown   -S chmod -S truncate -S lchown   -S rename -S renameat -S rmdir -S setfsgid   -S setgid   -S setuid   -F auid>1000000 -F auid<9999999 -F auid!=4294967295 -C auid!=uid -k IAM64
+#
+-a exit,always -F arch=b32 -S open -S openat       -F auid>1000000 -F auid<9999999 -F auid!=4294967295 -C auid!=uid -k open32    -F perm=wa
+-a exit,always -F arch=b64 -S open -S openat       -F auid>1000000 -F auid<9999999 -F auid!=4294967295 -C auid!=uid -k open64    -F perm=wa
+## PCI/DSS - Requirement 10.2.1
+## Monitor all individual accesses to cardholder data
+## (ask the Business Unit the directories to watch)
+##
+#-w /path/to/cardholder/data -k cardholder-data
+
+
+## PCI/DSS - Requirement 10.2.2
+## Monitor all actions taken by any individual with root
+## or administrative privileges
+##
+-a exit,always -F arch=b32 -S execve -F uid=root -F auid!=root -F auid!=4294967295 -k admin32
+-a exit,always -F arch=b64 -S execve -F uid=root -F auid!=root -F auid!=4294967295 -k admin64
+-w /sbin/agetty -p x -k console_access
+-w /sbin/mingetty -p x -k console_access
+
+
+# With -i we can monitor oracle mysql and sybase even if they don't actually exist
+#-a exit,always -F arch=b32 -S execve -F uid=oracle -F auid!=oracle -F auid!=4294967295 -k admin
+#-a exit,always -F arch=b64 -S execve -F uid=oracle -F auid!=oracle -F auid!=4294967295 -k admin
+#
+#-a exit,always -F arch=b32 -S execve -F uid=sybase -F auid!=sybase -F auid!=4294967295 -k admin
+#-a exit,always -F arch=b64 -S execve -F uid=sybase -F auid!=sybase -F auid!=4294967295 -k admin
+#
+#-a exit,always -F arch=b32 -S execve -F uid=mysql -F auid!=mysql -F auid!=4294967295 -k admin
+#-a exit,always -F arch=b64 -S execve -F uid=mysql -F auid!=mysql -F auid!=4294967295 -k admin
+
+
+## PCI/DSS - Requirement 10.2.4
+## Monitor invalid logical access attempts
+##
+# This point is cover by PAM, the log are into /var/log/secure
+
+
+## PCI/DSS - Requirement 10.2.5
+## Use of identification and authentication mechanisms
+##
+# This point is cover by the application of ISaAC2 policy
+
+
+## PCI/DSS - Requirement 10.2.6
+## Initialization of the audit logs
+##
+# Done by the daemons themselves (auditd and rsyslog)
+# and sent to the centralized log server
+
+
+## PCI/DSS - Requirement 10.2.7
+## Creation and deletion of system-level objects
+##
+# creation
+-a exit,always -F arch=b32 -S creat -S mkdir -S mknod -S link -S symlink -S mkdirat -S mknodat -S linkat -S symlinkat -F uid=root -F success=1 -k creation
+-a exit,always -F arch=b64 -S creat -S mkdir -S mknod -S link -S symlink -S mkdirat -S mknodat -S linkat -S symlinkat -F uid=root -F success=1 -k creation
+# deletion
+-a exit,always -F arch=b32 -S rmdir -S unlink -S unlinkat -F uid=root -F success=1 -k deletion
+-a exit,always -F arch=b64 -S rmdir -S unlink -S unlinkat -F uid=root -F success=1 -k deletion
+
+
+## PCI/DSS - Requirement 10.4
+## Synchronize all critical system clocks and times
+##
+## We use NTP and log things that could affect time
+##
+-a always,exit -F arch=b32 -S adjtimex -S settimeofday -S stime -k time_change
+-a always,exit -F arch=b64 -S adjtimex -S settimeofday -k time_change
+-w /etc/localtime -p wa -k time_change
+
+
+## PCI/DSS - Requirement 10.5
+## Secure audit trails so they cannot be altered
+## This point is covered outside auditd :
+## - umask is set to 022 so only root can see audit trails
+## - the audit trails are send to a centralize log server
+
+
+##
+## Outside the scope of PCI/DSS
+##
+
+
+## Things that could affect system locale
+-a exit,always -F arch=b32 -S sethostname -k system_locale
+-a exit,always -F arch=b64 -S sethostname -k system_locale
+-w /etc/issue -p wa -k system_locale
+-w /etc/issue.net -p wa -k system_locale
+-w /etc/hosts -p wa -k system_locale
+-w /etc/sysconfig/network -p wa -k system_locale
+
+
+# Monitoring sensitive Commands
+-w /bin/chown -p x -k system_commands
+-w /usr/local/sbin/tcpdump -p x -k system_commands
+-w /usr/bin/passwd -p x -k system_commands
+-w /usr/sbin/useradd -p x -k system_commands
+-w /usr/sbin/usermod -p x -k system_commands
+-w /bin/chgrp -p x -k system_commands
+-w /sbin/route -p x -k system_commands
+-w /sbin/shutdown -p x -k system_commands
+-w /sbin/reboot -p x -k system_commands
+-w /sbin/sysctl -p x -k system_commands
+-w /sbin/ifconfig -p x -k system_commands
+-w /usr/sbin/visudo -p x -k system_commands
+-w /usr/bin/crontab -p x -k system_commands
+-w /bin/chmod -p x -k system_commands
+-w /bin/su -p x -k system_commands
+-w /bin/env -p x -k system_commands
+-w /sbin/auditctl -p x -k system_commands
+
+# Action on kernel
+-w /sbin/rmmod -p x -k modules
+-w /sbin/modprobe -p x -k modules
+-a exit,always -F arch=b64 -S init_module -S delete_module -k modules
+-a exit,always -F arch=b32 -S init_module -S delete_module -k modules
+-a exit,always -F arch=b64 -S open -S openat -F exit=-EPERM -k rights
+-a exit,always -F arch=b32 -S open -S openat -F exit=-EPERM -k rights
+-a exit,always -F arch=b64 -S ptrace -k info_scan
+-a exit,always -F arch=b32 -S ptrace -k info_scan

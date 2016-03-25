@@ -1,0 +1,169 @@
+# This file contains the auditctl rules that are loaded
+# whenever the audit daemon is started via the initscripts.
+# The rules are simply the parameters that would be passed
+# to auditctl.
+
+# First rule - delete all
+-D
+
+# Ignore Errors
+-i
+
+# Increase the buffers to survive stress events.
+# Make this bigger for busy systems
+-b 8192
+
+# Feel free to add below this line. See auditctl man page
+
+## PCI/DSS - Requirement 10.2.1
+## Monitor all individual accesses to cardholder data
+## (ask the Business Unit the directories to watch)
+##
+#-w /path/to/cardholder/data -k cardholder-data
+
+
+## PCI/DSS - Requirement 10.2.2
+## Monitor all actions taken by any individual with root
+## or administrative privileges
+##
+-a exit,always -F arch=b32 -S execve -F uid=root -F auid!=root -F auid!=4294967295 -k admin
+-a exit,always -F arch=b64 -S execve -F uid=root -F auid!=root -F auid!=4294967295 -k admin
+-w /sbin/agetty -p x -k console_access
+-w /sbin/mingetty -p x -k console_access
+
+
+# With -i we can monitor oracle mysql and sybase even if they don't actually exist
+-a exit,always -F arch=b32 -S execve -F uid=oracle -F auid!=oracle -F auid!=4294967295 -k admin
+-a exit,always -F arch=b64 -S execve -F uid=oracle -F auid!=oracle -F auid!=4294967295 -k admin
+
+-a exit,always -F arch=b32 -S execve -F uid=sybase -F auid!=sybase -F auid!=4294967295 -k admin
+-a exit,always -F arch=b64 -S execve -F uid=sybase -F auid!=sybase -F auid!=4294967295 -k admin
+
+-a exit,always -F arch=b32 -S execve -F uid=mysql -F auid!=mysql -F auid!=4294967295 -k admin
+-a exit,always -F arch=b64 -S execve -F uid=mysql -F auid!=mysql -F auid!=4294967295 -k admin
+
+
+## PCI/DSS - Requirement 10.2.3
+## Monitor access to all audit trails
+##
+-w /var/log/audit/ -k audit_logs
+-w /var/log/secure -k audit_logs
+
+
+## PCI/DSS - Requirement 10.2.4
+## Monitor invalid logical access attempts
+##
+# This point is cover by PAM, the log are into /var/log/secure
+
+
+## PCI/DSS - Requirement 10.2.5
+## Use of identification and authentication mechanisms
+##
+# This point is cover by the application of ISaAC2 policy
+
+
+## PCI/DSS - Requirement 10.2.6
+## Initialization of the audit logs
+##
+# Done by the daemons themselves (auditd and rsyslog)
+# and sent to the centralized log server
+
+
+## PCI/DSS - Requirement 10.2.7
+## Creation and deletion of system-level objects
+##
+# creation
+-a exit,always -F arch=b32 -S creat -S mkdir -S mknod -S link -S symlink -S mkdirat -S mknodat -S linkat -S symlinkat -F uid=root -F success=1 -k creation
+-a exit,always -F arch=b64 -S creat -S mkdir -S mknod -S link -S symlink -S mkdirat -S mknodat -S linkat -S symlinkat -F uid=root -F success=1 -k creation
+# deletion
+-a exit,always -F arch=b32 -S rmdir -S unlink -S unlinkat -F uid=root -F success=1 -k deletion
+-a exit,always -F arch=b64 -S rmdir -S unlink -S unlinkat -F uid=root -F success=1 -k deletion
+
+
+## PCI/DSS - Requirement 10.4
+## Synchronize all critical system clocks and times
+##
+## We use NTP and log things that could affect time
+##
+-a always,exit -F arch=b32 -S adjtimex -S settimeofday -S stime -k time_change
+-a always,exit -F arch=b64 -S adjtimex -S settimeofday -k time_change
+-w /etc/localtime -p wa -k time_change
+
+
+## PCI/DSS - Requirement 10.5
+## Secure audit trails so they cannot be altered
+## This point is covered outside auditd :
+## - umask is set to 022 so only root can see audit trails
+## - the audit trails are send to a centralize log server
+
+
+##
+## Outside the scope of PCI/DSS
+##
+
+## Things that affect identity
+-w /etc/group -p wa -k identity
+-w /etc/passwd -p wa -k identity
+-w /etc/gshadow -p wa -k identity
+-w /etc/shadow -p wa -k identity
+-w /etc/security/opasswd -p wa -k identity
+-w /etc/cron.allow -p wa -k system_files
+-w /etc/ntp.conf -p wa -k system_files
+-w /etc/ssh/sshd_config -p wa -k system_files
+-w /etc/hosts -p wa -k system_files
+-w /etc/resolv.conf -p wa -k system_files
+-w /etc/audit.rules -p wa -k system_files
+-w /etc/auditd.conf -p wa -k system_files
+-w /etc/rsyslog.conf -p wa -k system_files
+
+## Things that could affect system locale
+-a exit,always -F arch=b32 -S sethostname -k system_locale
+-a exit,always -F arch=b64 -S sethostname -k system_locale
+-w /etc/issue -p wa -k system_locale
+-w /etc/issue.net -p wa -k system_locale
+-w /etc/hosts -p wa -k system_locale
+-w /etc/sysconfig/network -p wa -k system_locale
+
+## Things that could grant priviled escalation
+-w /etc/sudoers -p wa -k actions
+
+# Monitoring delete/Write SSH authorized_keys files
+-w /root/.ssh/authorized_keys -p wa -k ssh_files
+-w /home/admnet/.ssh/authorized_keys -p wa -k ssh_files
+-w /home/system/.ssh/authorized_keys -p war -k ssh_files
+-w /home/oper/.ssh/authorized_keys -p wa -k ssh_files
+-w /home/sprod/.ssh/authorized_keys -p wa -k ssh_files
+-w /home/www/.ssh/authorized_keys -p wa -k ssh_files
+-w /home/integ/.ssh/authorized_keys -p wa -k ssh_files
+-w /home/stat/.ssh/authorized_keys -p wa -k ssh_files
+-w /home/reference/.ssh/authorized_keys -p wa -k ssh_files
+
+# Monitoring Sensible Commands
+-w /bin/chown -p x -k system_commands
+-w /usr/local/sbin/tcpdump -p x -k system_commands
+-w /usr/bin/passwd -p x -k system_commands
+-w /usr/sbin/useradd -p x -k system_commands
+-w /usr/sbin/usermod -p x -k system_commands
+-w /bin/chgrp -p x -k system_commands
+-w /sbin/route -p x -k system_commands
+-w /sbin/shutdown -p x -k system_commands
+-w /sbin/reboot -p x -k system_commands
+-w /sbin/sysctl -p x -k system_commands
+-w /sbin/ifconfig -p x -k system_commands
+-w /usr/sbin/visudo -p x -k system_commands
+-w /usr/bin/crontab -p x -k system_commands
+-w /bin/chmod -p x -k system_commands
+-w /bin/su -p x -k system_commands
+-w /bin/env -p x -k system_commands
+-w /sbin/auditctl -p x -k system_commands
+
+# Action on kernel
+-w /sbin/rmmod -p x -k modules
+-w /sbin/modprobe -p x -k modules
+-a exit,always -F arch=b64 -S init_module -S delete_module -k modules
+-a exit,always -F arch=b32 -S init_module -S delete_module -k modules
+-a exit,always -F arch=b64 -S open -S openat -F exit=-EPERM -k rights
+-a exit,always -F arch=b32 -S open -S openat -F exit=-EPERM -k rights
+-a exit,always -F arch=b64 -S ptrace -k info_scan
+-a exit,always -F arch=b32 -S ptrace -k info_scan
+
